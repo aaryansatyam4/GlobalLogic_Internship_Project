@@ -1,134 +1,117 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import Cookies from "js-cookie";
-import axios from "axios";
-import Button from "../../Components/Button";
-import Modal from "../../Components/Modal";
-import TextInput from "../../Components/TextInput";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Cookies from 'js-cookie';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [categories, setCategories] = useState([]);
-  const [posts, setPosts] = useState([]);
-  const [formData, setFormData] = useState({
-    title: "",
-    content: "",
-    category_id: "",
-  });
+  const [blogs, setBlogs] = useState([
+    {
+      id: 1,
+      title: "Understanding React Hooks",
+      content: "React Hooks let you use state and other features without writing a class. They simplify code and enhance functionality.",
+    },
+    {
+      id: 2,
+      title: "Introduction to TypeScript",
+      content: "TypeScript adds static typing to JavaScript, making code more predictable and easier to debug.",
+    },
+    {
+      id: 3,
+      title: "GraphQL vs REST APIs",
+      content: "GraphQL provides more flexibility than REST by allowing clients to request only the needed data.",
+    },
+    {
+      id: 4,
+      title: "Optimizing React Performance",
+      content: "Using React.memo, lazy loading, and optimizing re-renders can significantly improve app performance.",
+    },
+    {
+      id: 5,
+      title: "Getting Started with Node.js",
+      content: "Node.js is a JavaScript runtime built on Chrome's V8 engine, ideal for scalable network applications.",
+    },
+  ]);
+  const [newBlog, setNewBlog] = useState({ title: '', content: '', image: null });
 
   useEffect(() => {
-    const token = Cookies.get("authToken");
+    const token = Cookies.get('authToken');
     if (!token) {
-      navigate("/");
+      navigate('/');
     }
-    fetchCategories();
-    fetchPosts();
   }, [navigate]);
 
-  const fetchCategories = async () => {
-    try {
-      const response = await axios.get("http://localhost:5001/getCategories");
-      setCategories(response.data);
-    } catch (error) {
-      console.error("Error fetching categories", error);
-    }
-  };
-
-  const fetchPosts = async () => {
-    try {
-      const response = await axios.get("http://localhost:5001/getBlogs");
-      setPosts(response.data);
-    } catch (error) {
-      console.error("Error fetching posts", error);
-    }
-  };
-
   const handleLogout = () => {
-    Cookies.remove("authToken");
-    navigate("/");
+    Cookies.remove('authToken');
+    navigate('/');
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setNewBlog({ ...newBlog, [name]: value });
   };
 
-  const handleSubmit = async () => {
-    const token = Cookies.get("authToken");
-    if (!token) return alert("Unauthorized. Please login.");
+  const handleImageChange = (e) => {
+    setNewBlog({ ...newBlog, image: e.target.files[0] });
+  };
 
-    try {
-      const decodedToken = JSON.parse(atob(token.split(".")[1])); // Decode JWT token
-      const userId = decodedToken.id;
-
-      await axios.post("http://localhost:5001/addBlog", {
-        user_id: userId,
-        title: formData.title,
-        content: formData.content,
-        category_id: formData.category_id,
-      });
-
-      alert("Post created successfully!");
-      setIsModalOpen(false);
-      setFormData({ title: "", content: "", category_id: "" });
-      fetchPosts();
-    } catch (error) {
-      console.error("Error saving post", error);
+  const handleAddBlog = () => {
+    if (newBlog.title && newBlog.content) {
+      const newEntry = { ...newBlog, id: blogs.length + 1 };
+      setBlogs([newEntry, ...blogs]);
+      setNewBlog({ title: '', content: '', image: null });
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Button text="Logout" onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded" />
+        <h1 className="text-2xl font-bold">Blog Section</h1>
+        <button
+          className="bg-red-500 text-white px-4 py-2 rounded"
+          onClick={handleLogout}
+        >
+          Logout
+        </button>
       </div>
-
-      <Button text="Create Post" onClick={() => setIsModalOpen(true)} className="bg-green-500 text-white px-4 py-2 rounded" />
-
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <h2 className="text-xl font-semibold mb-4">Create Post</h2>
-
-        <select
-          name="category_id"
-          value={formData.category_id}
+      <div className="mb-6 p-4 border rounded-lg shadow-md">
+        <h2 className="text-xl font-semibold mb-2">Create a New Blog</h2>
+        <input
+          type="text"
+          name="title"
+          placeholder="Title"
+          value={newBlog.title}
           onChange={handleInputChange}
           className="border p-2 w-full rounded mb-2"
-          required
+        />
+        <textarea
+          name="content"
+          placeholder="Content"
+          value={newBlog.content}
+          onChange={handleInputChange}
+          className="border p-2 w-full rounded mb-2"
+        />
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          className="border p-2 w-full rounded mb-2"
+        />
+        <button
+          className="bg-blue-500 text-white px-4 py-2 rounded"
+          onClick={handleAddBlog}
         >
-          <option value="">Select Category</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-
-        <TextInput type="text" name="title" placeholder="Post Title" value={formData.title} onChange={handleInputChange} required />
-        <textarea name="content" placeholder="Post Content" value={formData.content} onChange={handleInputChange} className="border p-2 w-full rounded mb-2" required />
-
-        <Button text="Submit" onClick={handleSubmit} className="bg-blue-500 text-white px-4 py-2 rounded mt-4" />
-      </Modal>
-
-      {/* Displaying Blog Titles Only */}
-      <div className="mt-6">
-        <h2 className="text-xl font-semibold mb-4">Blog Posts</h2>
-        {posts.length === 0 ? (
-          <p>No blog posts found.</p>
-        ) : (
-          posts.map((post) => (
-            <div key={post.id} className="border-b py-2">
-              <button
-                className="text-blue-500 hover:underline text-lg"
-                onClick={() => navigate(`/blog/${post.id}`)}
-              >
-                {post.title}
-              </button>
-            </div>
-          ))
-        )}
+          Add Blog
+        </button>
       </div>
+      {blogs.map((blog) => (
+        <div key={blog.id} className="mb-6 p-4 border rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-2">{blog.title}</h2>
+          <p className="mb-4">{blog.content}</p>
+          {blog.image && (
+            <img src={URL.createObjectURL(blog.image)} alt={blog.title} className="w-full h-auto rounded" />
+          )}
+        </div>
+      ))}
     </div>
   );
 };
