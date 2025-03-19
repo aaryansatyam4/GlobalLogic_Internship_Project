@@ -37,7 +37,6 @@ app.post("/signup", async (req, res) => {
     }
 });
 
-// ✅ Login API (Authenticate User)
 app.post("/signin", async (req, res) => {
     const { email, password } = req.body;
 
@@ -54,8 +53,12 @@ app.post("/signin", async (req, res) => {
             return res.status(401).json({ error: "Invalid password" });
         }
 
-        // Generate JWT token
-        const token = jwt.sign({ id: user[0].id, email: user[0].email }, JWT_SECRET, { expiresIn: "1h" });
+        // Generate JWT token with username
+        const token = jwt.sign(
+            { id: user[0].id, username: user[0].username, email: user[0].email }, 
+            JWT_SECRET, 
+            { expiresIn: "1h" }
+        );
 
         res.json({ token, user: { id: user[0].id, username: user[0].username, email: user[0].email } });
     } catch (error) {
@@ -75,6 +78,148 @@ app.get("/profile", (req, res) => {
         res.status(401).json({ error: "Invalid token" });
     }
 });
+
+// ✅ Add a New Category
+app.post("/addCategory", async (req, res) => {
+    const { name } = req.body;
+
+    try {
+        const [result] = await db.promise().query("INSERT INTO categories (name) VALUES (?)", [name]);
+        res.status(201).json({ categoryId: result.insertId, message: "Category added successfully" });
+    } catch (error) {
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+// ✅ Add a New Post
+app.post("/addPost", async (req, res) => {
+    const { user_id, title, content, category_id } = req.body;
+
+    try {
+        await db.promise().query(
+            "INSERT INTO posts (user_id, title, content, category_id) VALUES (?, ?, ?, ?)", 
+            [user_id, title, content, category_id]
+        );
+        res.status(201).json({ message: "Post added successfully" });
+    } catch (error) {
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+
+app.post("/addBlog", async (req, res) => {
+    const { user_id, title, content, category_id } = req.body;
+
+    try {
+        const [result] = await db.promise().query(
+            "INSERT INTO posts (user_id, title, content, category_id) VALUES (?, ?, ?, ?)",
+            [user_id, title, content, category_id]
+        );
+
+        res.status(201).json({ message: "Blog post added successfully", postId: result.insertId });
+    } catch (error) {
+        console.error("Error adding blog post:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+app.get("/getBlogs", async (req, res) => {
+    try {
+        const [posts] = await db.promise().query(`
+            SELECT posts.id, posts.title, posts.content, posts.created_at, 
+                   users.username, categories.name AS category 
+            FROM posts 
+            JOIN users ON posts.user_id = users.id 
+            LEFT JOIN categories ON posts.category_id = categories.id
+            ORDER BY posts.created_at DESC
+        `);
+
+        res.json(posts);
+    } catch (error) {
+        console.error("Error fetching blog posts:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+app.get("/getCategories", async (req, res) => {
+    try {
+        const [categories] = await db.promise().query("SELECT * FROM categories");
+        res.json(categories);
+    } catch (error) {
+        console.error("Error fetching categories:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+app.get("/getBlog/:id", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const [post] = await db.promise().query(`
+            SELECT posts.id, posts.title, posts.content, posts.created_at, 
+                   users.username, categories.name AS category 
+            FROM posts 
+            JOIN users ON posts.user_id = users.id 
+            LEFT JOIN categories ON posts.category_id = categories.id
+            WHERE posts.id = ?
+        `, [id]);
+
+        if (post.length === 0) {
+            return res.status(404).json({ error: "Blog post not found" });
+        }
+
+        res.json(post[0]);
+    } catch (error) {
+        console.error("Error fetching blog post:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+// ✅ Add a New Comment
+app.post("/addComment", async (req, res) => {
+    const { post_id, user_id, content } = req.body;
+
+    if (!post_id || !user_id || !content) {
+        return res.status(400).json({ error: "All fields are required" });
+    }
+
+    try {
+        const [result] = await db.promise().query(
+            "INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)", 
+            [post_id, user_id, content]
+        );
+
+        res.status(201).json({ message: "Comment added successfully", commentId: result.insertId });
+    } catch (error) {
+        console.error("Error adding comment:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+// ✅ Get Comments for a Post
+app.get("/getComments/:post_id", async (req, res) => {
+    const { post_id } = req.params;
+
+    try {
+        const [comments] = await db.promise().query(`
+            SELECT comments.id, comments.content, comments.created_at, 
+                   users.username 
+            FROM comments 
+            JOIN users ON comments.user_id = users.id 
+            WHERE comments.post_id = ?
+            ORDER BY comments.created_at ASC
+        `, [post_id]);
+
+        res.json(comments);
+    } catch (error) {
+        console.error("Error fetching comments:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+
+
+
+
 
 // ✅ Start the Server
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
